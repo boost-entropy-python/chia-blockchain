@@ -24,8 +24,9 @@ from chia.types.spend_bundle import SpendBundle
 from chia.util.bech32m import decode_puzzle_hash, encode_puzzle_hash
 from chia.util.byte_types import hexstr_to_bytes
 from chia.util.config import load_config
+from chia.util.errors import KeychainIsLocked
 from chia.util.ints import uint8, uint32, uint64, uint16
-from chia.util.keychain import KeyringIsLocked, bytes_to_mnemonic, generate_mnemonic
+from chia.util.keychain import bytes_to_mnemonic, generate_mnemonic
 from chia.util.path import path_from_root
 from chia.util.ws_message import WsRpcMessage, create_payload_dict
 from chia.wallet.cat_wallet.cat_constants import DEFAULT_CATS
@@ -224,7 +225,7 @@ class WalletRpcApi:
             fingerprints = [
                 sk.get_g1().get_fingerprint() for (sk, seed) in await self.service.keychain_proxy.get_all_private_keys()
             ]
-        except KeyringIsLocked:
+        except KeychainIsLocked:
             return {"keyring_is_locked": True}
         except Exception as e:
             raise Exception(
@@ -1659,7 +1660,7 @@ class WalletRpcApi:
             # Check if the metadata is updated
             full_puzzle: Program = Program.from_bytes(bytes(coin_spend.puzzle_reveal))
 
-            uncurried_nft: Optional[UncurriedNFT] = UncurriedNFT.uncurry(full_puzzle)
+            uncurried_nft: Optional[UncurriedNFT] = UncurriedNFT.uncurry(*full_puzzle.uncurry())
             if uncurried_nft is None:
                 return {"success": False, "error": "The coin is not a NFT."}
             metadata, p2_puzzle_hash = get_metadata_and_phs(uncurried_nft, coin_spend.solution)
