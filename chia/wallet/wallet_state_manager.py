@@ -77,7 +77,6 @@ from chia.wallet.wallet_interested_store import WalletInterestedStore
 from chia.wallet.wallet_nft_store import WalletNftStore
 from chia.wallet.wallet_pool_store import WalletPoolStore
 from chia.wallet.wallet_puzzle_store import WalletPuzzleStore
-from chia.wallet.wallet_sync_store import WalletSyncStore
 from chia.wallet.wallet_transaction_store import WalletTransactionStore
 from chia.wallet.wallet_user_store import WalletUserStore
 from chia.wallet.uncurried_puzzle import uncurry_puzzle
@@ -119,7 +118,6 @@ class WalletStateManager:
     user_settings: UserSettings
     blockchain: WalletBlockchain
     coin_store: WalletCoinStore
-    sync_store: WalletSyncStore
     interested_store: WalletInterestedStore
     multiprocessing_context: multiprocessing.context.BaseContext
     server: ChiaServer
@@ -1000,7 +998,7 @@ class WalletStateManager:
 
             # if the coin has been spent
             elif coin_state.created_height is not None and coin_state.spent_height is not None:
-                self.log.info(f"Coin Removed: {coin_state}")
+                self.log.debug("Coin Removed: %s", coin_state)
                 if coin_name in trade_removals:
                     trade_coin_removed.append(coin_state)
                 children: Optional[List[CoinState]] = None
