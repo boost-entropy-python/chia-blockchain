@@ -3,9 +3,9 @@ import os
 from setuptools import setup
 
 dependencies = [
-    "aiofiles==0.7.0",  # Async IO for files
+    "aiofiles==22.1.0",  # Async IO for files
     "blspy==1.0.15",  # Signature library
-    "chiavdf==1.0.6",  # timelord and vdf verification
+    "chiavdf==1.0.7",  # timelord and vdf verification
     "chiabip158==1.1",  # bip158-style wallet filters
     "chiapos==1.0.11",  # proof of space
     "clvm==0.9.7",
@@ -17,7 +17,7 @@ dependencies = [
     "bitstring==3.1.9",  # Binary data management library
     "colorama==0.4.5",  # Colorizes terminal output
     "colorlog==6.6.0",  # Adds color to logs
-    "concurrent-log-handler==0.9.19",  # Concurrently log and rotate logs
+    "concurrent-log-handler==0.9.20",  # Concurrently log and rotate logs
     "cryptography==36.0.2",  # Python cryptography library for TLS - keyring conflict
     "filelock==3.7.1",  # For reading and writing config multiprocess and multithread safely  (non-reentrant locks)
     "keyring==23.6.0",  # Store keys in MacOS Keychain, Windows Credential Locker
