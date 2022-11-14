@@ -32,6 +32,18 @@ jobs:
           api_token: ${{ secrets.BOOST_API_TOKEN }}
           registry_module: boostsecurityio/native-scanner
 
+  boost-safety:
+    name: Safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Run Safety
+        uses: boostsecurityio/boostsec-scanner-github@v4
+        with:
+          api_token: ${{ secrets.BOOST_API_TOKEN }}
+          registry_module: boostsecurityio/safety
+
   boost-sbom:
     name: SBOM
     runs-on: ubuntu-latest
