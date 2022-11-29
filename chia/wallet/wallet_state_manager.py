@@ -766,33 +766,15 @@ class WalletStateManager:
         self.log.info(f"parent: {parent_coin_state.coin.name()} inner_puzzle_hash for parent is {inner_puzzle_hash}")
 
         hint_list = compute_coin_hints(coin_spend)
-        old_inner_puzhash = DID_INNERPUZ_MOD.curry(
-            p2_puzzle, recovery_list_hash, num_verification, singleton_struct, metadata
-        ).get_tree_hash()
+
         derivation_record = None
-        # Hint is required, if it doesn't have any hint then it should a bugged DID
-        is_bugged = len(hint_list) == 0
-        new_p2_puzhash: Optional[bytes32] = None
         for hint in hint_list:
             derivation_record = await self.puzzle_store.get_derivation_record_for_puzzle_hash(bytes32(hint))
             if derivation_record is not None:
-                new_p2_puzhash = hint
                 break
-            # Check if the mismatch is because of the memo bug
-            if hint == old_inner_puzhash:
-                new_p2_puzhash = hint
-                is_bugged = True
-                break
-        if is_bugged:
-            # This is a bugged DID, check if we are owner
-            derivation_record = await self.puzzle_store.get_derivation_record_for_puzzle_hash(bytes32(p2_puzzle))
 
         launch_id: bytes32 = bytes32(bytes(singleton_struct.rest().first())[1:])
         if derivation_record is None:
-            if new_p2_puzhash != old_inner_puzhash and p2_puzzle != new_p2_puzhash:
-                # We only delete DID when the p2 puzzle doesn't change
-                self.log.info(f"Not sure if the DID belong to us, {coin_state}. Waiting for next spend ...")
-                return wallet_id, wallet_type
             self.log.info(f"Received state for the coin that doesn't belong to us {coin_state}")
             # Check if it was owned by us
             removed_wallet_ids = []
@@ -954,8 +936,8 @@ class WalletStateManager:
                 assert isinstance(nft_wallet, NFTWallet)
                 if parent_coin_state.spent_height is not None:
                     await nft_wallet.remove_coin(coin_spend.coin, uint32(parent_coin_state.spent_height))
-                    num = await nft_wallet.get_current_nfts()
-                    if len(num) == 0 and nft_wallet.did_id is not None and new_did_id != old_did_id:
+                    is_empty = await nft_wallet.is_empty()
+                    if is_empty and nft_wallet.did_id is not None and new_did_id != old_did_id:
                         self.log.info(f"No NFT, deleting wallet {nft_wallet.did_id.hex()} ...")
                         await self.user_store.delete_wallet(nft_wallet.wallet_info.id)
                         self.wallets.pop(nft_wallet.wallet_info.id)
