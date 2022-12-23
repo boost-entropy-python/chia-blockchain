@@ -389,13 +389,7 @@ class MempoolManager:
             return Err(npc_result.error), None, []
 
         cost = npc_result.cost
-
         log.debug(f"Cost: {cost}")
-
-        if cost > self.max_block_clvm_cost:
-            # we shouldn't ever end up here, since the cost is limited when we
-            # execute the CLVM program.
-            return Err.BLOCK_COST_EXCEEDS_MAX, None, []
 
         assert npc_result.conds is not None
         # build removal list
@@ -464,7 +458,7 @@ class MempoolManager:
                 return Err.INVALID_FEE_LOW_FEE, None, []
         # Check removals against UnspentDB + DiffStore + Mempool + SpendBundle
         # Use this information later when constructing a block
-        fail_reason, conflicts = await self.check_removals(removal_record_dict)
+        fail_reason, conflicts = self.check_removals(removal_record_dict)
         # If there is a mempool conflict check if this SpendBundle has a higher fee per cost than all others
         conflicting_pool_items: Dict[bytes32, MempoolItem] = {}
 
@@ -520,7 +514,7 @@ class MempoolManager:
 
         return None, potential, list(conflicting_pool_items.keys())
 
-    async def check_removals(self, removals: Dict[bytes32, CoinRecord]) -> Tuple[Optional[Err], List[Coin]]:
+    def check_removals(self, removals: Dict[bytes32, CoinRecord]) -> Tuple[Optional[Err], List[Coin]]:
         """
         This function checks for double spends, unknown spends and conflicting transactions in mempool.
         Returns Error (if any), dictionary of Unspents, list of coins with conflict errors (if any any).
