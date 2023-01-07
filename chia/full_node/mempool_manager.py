@@ -348,8 +348,8 @@ class MempoolManager:
         if err is None:
             # No error, immediately add to mempool, after removing conflicting TXs.
             assert item is not None
-            self.mempool.add_to_pool(item)
             self.mempool.remove_from_pool(remove_items, MempoolRemoveReason.CONFLICT)
+            self.mempool.add_to_pool(item)
             return item.cost, MempoolInclusionStatus.SUCCESS, None
         elif item is not None:
             # There is an error,  but we still returned a mempool item, this means we should add to the pending pool.
@@ -581,9 +581,12 @@ class MempoolManager:
                         spendbundle_ids: List[bytes32] = self.mempool.removal_coin_id_to_spendbundle_ids[
                             bytes32(spend.coin_id)
                         ]
-                        self.mempool.remove_from_pool(spendbundle_ids, MempoolRemoveReason.BLOCK_INCLUSION)
                         for spendbundle_id in spendbundle_ids:
+                            item = self.mempool.spends.get(spendbundle_id)
+                            if item:
+                                included_items.append(item)
                             self.remove_seen(spendbundle_id)
+                        self.mempool.remove_from_pool(spendbundle_ids, MempoolRemoveReason.BLOCK_INCLUSION)
         else:
             old_pool = self.mempool
             self.mempool = Mempool(old_pool.mempool_info, old_pool.fee_estimator)
