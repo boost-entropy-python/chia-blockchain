@@ -34,7 +34,7 @@ jobs:
       run: |
         unset HAS_SNYK_SECRET
         if [ -n "$SNYK_TOKEN" ]; then HAS_SNYK_SECRET='true' ; fi
-        echo HAS_SNYK_SECRET=${HAS_SNYK_SECRET} >> GITHUB_OUTPUT
+        echo HAS_SNYK_SECRET=${HAS_SNYK_SECRET} >> $GITHUB_OUTPUT
       env:
         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
@@ -46,7 +46,7 @@ jobs:
 
     - name: Setup Python environment
       if: steps.check_secrets.outputs.HAS_SNYK_SECRET
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
 
