@@ -878,7 +878,12 @@ class WalletRpcApi:
             else:
                 raise ValueError(f"Transaction 0x{transaction_id.hex()} doesn't have any coin spend.")
         assert tr.spend_bundle is not None
-        return {transaction_id.hex(): compute_memos(tr.spend_bundle)}
+        memos: Dict[bytes32, List[bytes]] = compute_memos(tr.spend_bundle)
+        response = {}
+        # Convert to hex string
+        for coin_id, memo_list in memos.items():
+            response[coin_id.hex()] = [memo.hex() for memo in memo_list]
+        return {transaction_id.hex(): response}
 
     async def get_transactions(self, request: Dict) -> EndpointResult:
         wallet_id = int(request["wallet_id"])
@@ -2548,7 +2553,10 @@ class WalletRpcApi:
         if coin_id.startswith(AddressType.NFT.hrp(self.service.config)):
             coin_id = decode_puzzle_hash(coin_id)
         else:
-            coin_id = bytes32.from_hexstr(coin_id)
+            try:
+                coin_id = bytes32.from_hexstr(coin_id)
+            except ValueError:
+                return {"success": False, "error": f"Invalid Coin ID format for 'coin_id': {request['coin_id']!r}"}
         # Get coin state
         peer: Optional[WSChiaConnection] = self.service.get_full_node_peer()
         assert peer is not None
