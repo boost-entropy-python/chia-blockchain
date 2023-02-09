@@ -99,7 +99,7 @@ class FullNode:
     pow_creation: Dict[bytes32, asyncio.Event]
     state_changed_callback: Optional[StateChangedProtocol] = None
     full_node_peers: Optional[FullNodePeers]
-    sync_store: Any
+    sync_store: SyncStore
     signage_point_times: List[float]
     full_node_store: FullNodeStore
     uncompact_task: Optional[asyncio.Task[None]]
@@ -156,7 +156,7 @@ class FullNode:
         self.pow_creation = {}
         self.state_changed_callback = None
         self.full_node_peers = None
-        self.sync_store = None
+        self.sync_store = SyncStore()
         self.signage_point_times = [time.time() for _ in range(self.constants.NUM_SPS_SUB_SLOT)]
         self.full_node_store = FullNodeStore(self.constants)
         self.uncompact_task = None
@@ -350,7 +350,6 @@ class FullNode:
                             pass
 
         self._block_store = await BlockStore.create(self.db_wrapper)
-        self.sync_store = SyncStore()
         self._hint_store = await HintStore.create(self.db_wrapper)
         self._coin_store = await CoinStore.create(self.db_wrapper)
         self.log.info("Initializing blockchain from disk")
@@ -878,11 +877,6 @@ class FullNode:
         # Remove all ph | coin id subscription for this peer
         self.subscriptions.remove_peer(connection.peer_node_id)
 
-    def _num_needed_peers(self) -> int:
-        assert self.server.all_connections is not None
-        diff: int = int(self.config["target_peer_count"]) - len(self.server.all_connections)
-        return diff if diff >= 0 else 0
-
     def _close(self) -> None:
         self._shut_down = True
         if self._init_weight_proof is not None:
@@ -968,22 +962,20 @@ class FullNode:
             self.log.info(f"Selected peak {target_peak}")
             # Check which peers are updated to this height
 
-            peers: List[bytes32] = []
+            peers = self.server.get_connections(NodeType.FULL_NODE)
             coroutines = []
-            for peer in self.server.all_connections.values():
-                if peer.connection_type == NodeType.FULL_NODE:
-                    peers.append(peer.peer_node_id)
-                    coroutines.append(
-                        peer.call_api(
-                            FullNodeAPI.request_block,
-                            full_node_protocol.RequestBlock(target_peak.height, True),
-                            timeout=10,
-                        )
+            for peer in peers:
+                coroutines.append(
+                    peer.call_api(
+                        FullNodeAPI.request_block,
+                        full_node_protocol.RequestBlock(target_peak.height, True),
+                        timeout=10,
                     )
+                )
             for i, target_peak_response in enumerate(await asyncio.gather(*coroutines)):
                 if target_peak_response is not None and isinstance(target_peak_response, RespondBlock):
                     self.sync_store.peer_has_block(
-                        target_peak.header_hash, peers[i], target_peak.weight, target_peak.height, False
+                        target_peak.header_hash, peers[i].peer_node_id, target_peak.weight, target_peak.height, False
                     )
             # TODO: disconnect from peer which gave us the heaviest_peak, if nobody has the peak
 
