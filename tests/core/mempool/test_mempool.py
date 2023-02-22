@@ -40,7 +40,12 @@ from chia.types.mempool_item import MempoolItem
 from chia.types.spend_bundle import SpendBundle
 from chia.types.spend_bundle_conditions import Spend, SpendBundleConditions
 from chia.util.api_decorators import api_request
-from chia.util.condition_tools import conditions_for_solution, pkm_pairs, pkm_pairs_for_conditions_dict
+from chia.util.condition_tools import (
+    conditions_for_solution,
+    parse_sexp_to_conditions,
+    pkm_pairs,
+    pkm_pairs_for_conditions_dict,
+)
 from chia.util.errors import ConsensusError, Err
 from chia.util.hash import std_hash
 from chia.util.ints import uint32, uint64
@@ -414,7 +419,7 @@ class TestMempoolManager:
 
         assert status == expected
         if expected == MempoolInclusionStatus.SUCCESS:
-            assert mempool_bundle is bundle
+            assert mempool_bundle == bundle
             assert err is None
         else:
             assert mempool_bundle is None
@@ -441,7 +446,7 @@ class TestMempoolManager:
         mempool_bundle = full_node_1.full_node.mempool_manager.get_spendbundle(bundle.name())
 
         assert err is None
-        assert mempool_bundle is bundle
+        assert mempool_bundle == bundle
         assert status == MempoolInclusionStatus.SUCCESS
 
     # this test makes sure that one spend successfully asserts the announce from
@@ -465,7 +470,7 @@ class TestMempoolManager:
         mempool_bundle = full_node_1.full_node.mempool_manager.get_spendbundle(bundle.name())
 
         assert err is None
-        assert mempool_bundle is bundle
+        assert mempool_bundle == bundle
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -758,7 +763,7 @@ class TestMempoolManager:
         blocks, spend_bundle1, peer, status, err = await self.condition_tester(one_node_one_block, wallet_a, dic)
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -784,7 +789,7 @@ class TestMempoolManager:
         blocks, spend_bundle1, peer, status, err = await self.condition_tester(one_node_one_block, wallet_a, dic)
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -825,7 +830,7 @@ class TestMempoolManager:
 
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -857,7 +862,7 @@ class TestMempoolManager:
 
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -876,7 +881,7 @@ class TestMempoolManager:
 
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -945,7 +950,7 @@ class TestMempoolManager:
         blocks, spend_bundle1, peer, status, err = await self.condition_tester(one_node_one_block, wallet_a, dic)
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -988,7 +993,7 @@ class TestMempoolManager:
         blocks, spend_bundle1, peer, status, err = await self.condition_tester(one_node_one_block, wallet_a, dic)
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -1044,7 +1049,7 @@ class TestMempoolManager:
 
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -1090,7 +1095,7 @@ class TestMempoolManager:
 
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     # ensure one spend can assert a coin announcement from another spend
@@ -1113,7 +1118,7 @@ class TestMempoolManager:
         mempool_bundle = full_node_1.full_node.mempool_manager.get_spendbundle(bundle.name())
 
         assert err is None
-        assert mempool_bundle is bundle
+        assert mempool_bundle == bundle
         assert status == MempoolInclusionStatus.SUCCESS
 
     # ensure one spend can assert a coin announcement from another spend, even
@@ -1158,7 +1163,7 @@ class TestMempoolManager:
         assert status == expected_included
         if status == MempoolInclusionStatus.SUCCESS:
             mempool_bundle = full_node_1.full_node.mempool_manager.get_spendbundle(bundle.name())
-            assert mempool_bundle is bundle
+            assert mempool_bundle == bundle
 
     @pytest.mark.asyncio
     async def test_coin_announcement_missing_arg(self, one_node_one_block, wallet_a):
@@ -1316,7 +1321,7 @@ class TestMempoolManager:
         mempool_bundle = full_node_1.full_node.mempool_manager.get_spendbundle(bundle.name())
 
         assert err is None
-        assert mempool_bundle is bundle
+        assert mempool_bundle == bundle
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -1360,7 +1365,7 @@ class TestMempoolManager:
         assert status == expected_included
         if status == MempoolInclusionStatus.SUCCESS:
             mempool_bundle = full_node_1.full_node.mempool_manager.get_spendbundle(bundle.name())
-            assert mempool_bundle is bundle
+            assert mempool_bundle == bundle
 
     @pytest.mark.asyncio
     async def test_puzzle_announcement_missing_arg(self, one_node_one_block, wallet_a):
@@ -1736,7 +1741,7 @@ class TestMempoolManager:
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
 
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -1813,7 +1818,7 @@ class TestMempoolManager:
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
 
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -1888,7 +1893,7 @@ class TestMempoolManager:
         sb1 = full_node_1.full_node.mempool_manager.get_spendbundle(spend_bundle1.name())
 
         assert err is None
-        assert sb1 is spend_bundle1
+        assert sb1 == spend_bundle1
         assert status == MempoolInclusionStatus.SUCCESS
 
     @pytest.mark.asyncio
@@ -2660,3 +2665,40 @@ class TestPkmPairsForConditionDict:
 
         with pytest.raises(ConsensusError, match="INVALID_CONDITION"):
             pkm_pairs_for_conditions_dict(conds, self.h1, b"g2")
+
+
+class TestParseSexpCondition:
+    def test_basic(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[bytes([49]), b"foo", b"bar"]]))
+        assert err is None
+        assert conds == [ConditionWithArgs(ConditionOpcode.AGG_SIG_UNSAFE, [b"foo", b"bar"])]
+
+    def test_oversized_op(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[bytes([49, 49]), b"foo", b"bar"]]))
+        assert err is Err.INVALID_CONDITION
+        assert conds is None
+
+    def test_empty_op(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[b"", b"foo", b"bar"]]))
+        assert err is Err.INVALID_CONDITION
+        assert conds is None
+
+    def test_list_op(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[[bytes([49])], b"foo", b"bar"]]))
+        assert err is Err.INVALID_CONDITION
+        assert conds is None
+
+    def test_list_arg(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[bytes([49]), [b"foo", b"bar"]]]))
+        assert err is None
+        assert conds == [ConditionWithArgs(ConditionOpcode.AGG_SIG_UNSAFE, [])]
+
+    def test_list_arg_truncate(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[bytes([49]), b"baz", [b"foo", b"bar"]]]))
+        assert err is None
+        assert conds == [ConditionWithArgs(ConditionOpcode.AGG_SIG_UNSAFE, [b"baz"])]
+
+    def test_arg_limit(self) -> None:
+        err, conds = parse_sexp_to_conditions(Program.to([[bytes([49]), b"1", b"2", b"3", b"4", b"5", b"6"]]))
+        assert err is None
+        assert conds == [ConditionWithArgs(ConditionOpcode.AGG_SIG_UNSAFE, [b"1", b"2", b"3", b"4"])]
