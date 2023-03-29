@@ -24,7 +24,7 @@ from chia.types.spend_bundle import SpendBundle
 from chia.util.byte_types import hexstr_to_bytes
 from chia.util.condition_tools import conditions_dict_for_solution, pkm_pairs_for_conditions_dict
 from chia.util.hash import std_hash
-from chia.util.ints import uint8, uint32, uint64, uint128
+from chia.util.ints import uint32, uint64, uint128
 from chia.wallet.cat_wallet.cat_constants import DEFAULT_CATS
 from chia.wallet.cat_wallet.cat_info import CATInfo, LegacyCATInfo
 from chia.wallet.cat_wallet.cat_utils import (
@@ -125,7 +125,7 @@ class CATWallet:
             await wallet_state_manager.user_store.delete_wallet(self.id())
             raise ValueError("Failed to create spend.")
 
-        await self.wallet_state_manager.add_new_wallet(self, self.id())
+        await self.wallet_state_manager.add_new_wallet(self)
 
         # If the new CAT name wasn't originally provided, we used a temporary name before issuance
         # since we didn't yet know the TAIL. Now we know the TAIL, we can update the name
@@ -207,7 +207,7 @@ class CATWallet:
         self.wallet_info = await wallet_state_manager.user_store.create_wallet(name, WalletType.CAT, info_as_string)
 
         self.lineage_store = await CATLineageStore.create(self.wallet_state_manager.db_wrapper, self.get_asset_id())
-        await self.wallet_state_manager.add_new_wallet(self, self.id())
+        await self.wallet_state_manager.add_new_wallet(self)
         return self
 
     @classmethod
@@ -254,8 +254,8 @@ class CATWallet:
         return self
 
     @classmethod
-    def type(cls) -> uint8:
-        return uint8(WalletType.CAT)
+    def type(cls) -> WalletType:
+        return WalletType.CAT
 
     def id(self) -> uint32:
         return self.wallet_info.id

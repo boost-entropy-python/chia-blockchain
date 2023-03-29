@@ -16,7 +16,7 @@ from blspy import AugSchemeMPL, G1Element, G2Element, PrivateKey
 from packaging.version import Version
 
 from chia.consensus.block_record import BlockRecord
-from chia.consensus.blockchain import ReceiveBlockResult
+from chia.consensus.blockchain import AddBlockResult
 from chia.consensus.constants import ConsensusConstants
 from chia.daemon.keychain_proxy import KeychainProxy, connect_to_keychain_and_validate, wrap_local_keychain
 from chia.full_node.full_node_api import FullNodeAPI
@@ -107,7 +107,7 @@ class WalletNode:
     synced_peers: Set[bytes32] = dataclasses.field(default_factory=set)
     wallet_peers: Optional[WalletPeers] = None
     valid_wp_cache: Dict[bytes32, Any] = dataclasses.field(default_factory=dict)
-    untrusted_caches: Dict[bytes32, PeerRequestCache] = dataclasses.field(default_factory=dict)
+    peer_caches: Dict[bytes32, PeerRequestCache] = dataclasses.field(default_factory=dict)
     # in Untrusted mode wallet might get the state update before receiving the block
     race_cache: Dict[bytes32, Set[CoinState]] = dataclasses.field(default_factory=dict)
     race_cache_hashes: List[Tuple[uint32, bytes32]] = dataclasses.field(default_factory=list)
@@ -175,13 +175,13 @@ class WalletNode:
         return self._keychain_proxy
 
     def get_cache_for_peer(self, peer) -> PeerRequestCache:
-        if peer.peer_node_id not in self.untrusted_caches:
-            self.untrusted_caches[peer.peer_node_id] = PeerRequestCache()
-        return self.untrusted_caches[peer.peer_node_id]
+        if peer.peer_node_id not in self.peer_caches:
+            self.peer_caches[peer.peer_node_id] = PeerRequestCache()
+        return self.peer_caches[peer.peer_node_id]
 
     def rollback_request_caches(self, reorg_height: int):
         # Everything after reorg_height should be removed from the cache
-        for cache in self.untrusted_caches.values():
+        for cache in self.peer_caches.values():
             cache.clear_after_height(reorg_height)
 
     async def get_key_for_fingerprint(self, fingerprint: Optional[int]) -> Optional[PrivateKey]:
@@ -491,7 +491,7 @@ class WalletNode:
                         async with self.wallet_state_manager.db_wrapper.writer():
                             self.log.info(f"retrying coin_state: {state}")
                             try:
-                                await self.wallet_state_manager.new_coin_state(
+                                await self.wallet_state_manager.add_coin_states(
                                     [state], peer, None if fork_height == 0 else fork_height
                                 )
                             except Exception as e:
@@ -632,8 +632,8 @@ class WalletNode:
             self.local_node_synced = False
             self.initialize_wallet_peers()
 
-        if peer.peer_node_id in self.untrusted_caches:
-            self.untrusted_caches.pop(peer.peer_node_id)
+        if peer.peer_node_id in self.peer_caches:
+            self.peer_caches.pop(peer.peer_node_id)
         if peer.peer_node_id in self.synced_peers:
             self.synced_peers.remove(peer.peer_node_id)
         if peer.peer_node_id in self.node_peaks:
@@ -850,7 +850,7 @@ class WalletNode:
                                 f"{inner_idx_start + len(inner_states) - 1}/ {len(items)})"
                             )
                             try:
-                                await self.wallet_state_manager.new_coin_state(valid_states, peer, fork_height)
+                                await self.wallet_state_manager.add_coin_states(valid_states, peer, fork_height)
                             except Exception as e:
                                 tb = traceback.format_exc()
                                 self.log.error(f"Exception while adding state: {e} {tb}")
@@ -881,7 +881,7 @@ class WalletNode:
                 async with self.wallet_state_manager.db_wrapper.writer():
                     try:
                         self.log.info(f"new coin state received ({idx}-{idx + len(states) - 1}/ {len(items)})")
-                        await self.wallet_state_manager.new_coin_state(states, peer, fork_height)
+                        await self.wallet_state_manager.add_coin_states(states, peer, fork_height)
                     except Exception as e:
                         tb = traceback.format_exc()
                         self.log.error(f"Error adding states.. {e} {tb}")
@@ -997,7 +997,7 @@ class WalletNode:
         Returns the timestamp for transaction block at h=height, if not transaction block, backtracks until it finds
         a transaction block
         """
-        for cache in self.untrusted_caches.values():
+        for cache in self.peer_caches.values():
             cache_ts: Optional[uint64] = cache.get_height_timestamp(height)
             if cache_ts is not None:
                 return cache_ts
@@ -1219,7 +1219,7 @@ class WalletNode:
         for block in blocks:
             # Set blockchain to the latest peak
             res, err = await self.wallet_state_manager.blockchain.receive_block(block)
-            if res == ReceiveBlockResult.INVALID_BLOCK:
+            if res == AddBlockResult.INVALID_BLOCK:
                 raise ValueError(err)
 
         return fork_height
