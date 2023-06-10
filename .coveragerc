@@ -6,7 +6,7 @@ source_pkgs=
   tests
 omit=
   tests/**/config.py
-concurrency=multiprocessing
+concurrency=multiprocessing, thread
 parallel=True
 
 [report]
@@ -17,3 +17,4 @@ exclude_lines =
   typing\.overload
   ^\s*\.\.\.\s*$
   if typing.TYPE_CHECKING:
+  if TYPE_CHECKING:
