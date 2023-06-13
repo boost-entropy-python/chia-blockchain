@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from chia.protocols import full_node_protocol, wallet_protocol
@@ -13,14 +14,8 @@ from chia.util.api_decorators import api_request
 class CrawlerAPI:
     crawler: Crawler
 
-    def __init__(self, crawler):
+    def __init__(self, crawler: Crawler) -> None:
         self.crawler = crawler
-
-    def __getattr__(self, attr_name: str):
-        async def invoke(*args, **kwargs):
-            pass
-
-        return invoke
 
     @property
     def server(self) -> ChiaServer:
@@ -28,11 +23,13 @@ class CrawlerAPI:
         return self.crawler.server
 
     @property
-    def log(self):
+    def log(self) -> logging.Logger:
         return self.crawler.log
 
     @api_request(peer_required=True)
-    async def request_peers(self, _request: full_node_protocol.RequestPeers, peer: WSChiaConnection):
+    async def request_peers(
+        self, _request: full_node_protocol.RequestPeers, peer: WSChiaConnection
+    ) -> Optional[Message]:
         pass
 
     @api_request(peer_required=True)
@@ -63,7 +60,9 @@ class CrawlerAPI:
         pass
 
     @api_request(peer_required=True)
-    async def new_compact_vdf(self, request: full_node_protocol.NewCompactVDF, peer: WSChiaConnection):
+    async def new_compact_vdf(
+        self, request: full_node_protocol.NewCompactVDF, peer: WSChiaConnection
+    ) -> Optional[Message]:
         pass
 
     @api_request()
