@@ -11,7 +11,7 @@ dependencies = [
     "blspy==2.0.2",  # Signature library
     "boto3==1.28.25",  # AWS S3 for DL s3 plugin
     "chiavdf==1.0.11",  # timelord and vdf verification
-    "chiabip158==1.2",  # bip158-style wallet filters
+    "chiabip158==1.3",  # bip158-style wallet filters
     "chiapos==2.0.2",  # proof of space
     "clvm==0.9.7",
     "clvm_tools==0.4.6",  # Currying, Program.to, other conveniences
@@ -59,7 +59,7 @@ dev_dependencies = [
     "twine==4.0.2",
     "isort==5.12.0",
     "flake8==6.1.0",
-    "mypy==1.4.1",
+    "mypy==1.5.1",
     "black==23.7.0",
     "aiohttp_cors==0.7.0",  # For blackd
     "ipython==8.12.2",  # For asyncio debugging
@@ -111,7 +111,6 @@ kwargs = dict(
         ]
     },
     package_data={
-        "chia": ["pyinstaller.spec"],
         "": ["*.clsp", "*.clsp.hex", "*.clvm", "*.clib", "py.typed"],
         "chia.util": ["initial-*.yaml", "english.txt"],
         "chia.ssl": ["chia_ca.crt", "chia_ca.key", "dst_root_ca.pem"],
