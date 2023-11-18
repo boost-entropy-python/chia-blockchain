@@ -35,7 +35,6 @@ from chia.simulator.keyring import TempKeyring
 from chia.simulator.setup_nodes import SimulatorsAndWalletsServices
 from chia.simulator.setup_services import setup_full_node
 from chia.simulator.simulator_protocol import FarmNewBlockProtocol
-from chia.simulator.time_out_assert import time_out_assert, time_out_assert_custom_interval, time_out_messages
 from chia.types.blockchain_format.classgroup import ClassgroupElement
 from chia.types.blockchain_format.foliage import Foliage, FoliageTransactionBlock, TransactionsInfo
 from chia.types.blockchain_format.program import Program
@@ -50,7 +49,7 @@ from chia.types.condition_with_args import ConditionWithArgs
 from chia.types.full_block import FullBlock
 from chia.types.mempool_inclusion_status import MempoolInclusionStatus
 from chia.types.peer_info import PeerInfo, TimestampedPeerInfo
-from chia.types.spend_bundle import SpendBundle
+from chia.types.spend_bundle import SpendBundle, estimate_fees
 from chia.types.unfinished_block import UnfinishedBlock
 from chia.util.errors import ConsensusError, Err
 from chia.util.hash import std_hash
@@ -67,6 +66,7 @@ from tests.core.full_node.stores.test_coin_store import get_future_reward_coins
 from tests.core.make_block_generator import make_spend_bundle
 from tests.core.mempool.test_mempool_performance import wallet_height_at_least
 from tests.core.node_height import node_height_at_least
+from tests.util.time_out_assert import time_out_assert, time_out_assert_custom_interval, time_out_messages
 
 
 async def new_transaction_not_requested(incoming, new_spend):
@@ -965,7 +965,7 @@ class TestFullNodeProtocol:
                 )
             ]
             spend_bundle = SpendBundle.aggregate(spend_bundles)
-            assert spend_bundle.fees() == fee
+            assert estimate_fees(spend_bundle) == fee
             respond_transaction = wallet_protocol.SendTransaction(spend_bundle)
 
             await full_node_1.send_transaction(respond_transaction)
