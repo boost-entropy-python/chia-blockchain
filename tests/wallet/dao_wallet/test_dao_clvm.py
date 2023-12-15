@@ -10,7 +10,7 @@ from chia.clvm.spend_sim import SimClient, SpendSim, sim_and_client
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import INFINITE_COST, Program
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.types.coin_spend import CoinSpend
+from chia.types.coin_spend import make_spend
 from chia.types.condition_opcodes import ConditionOpcode
 from chia.types.mempool_inclusion_status import MempoolInclusionStatus
 from chia.types.spend_bundle import SpendBundle
@@ -712,8 +712,11 @@ def test_merge_p2_singleton() -> None:
         Program.to("fake_parent_3").get_tree_hash(),
     ]
     amounts = [1000, 2000, 3000]
-    parent_puzhash_amounts = [[pid, my_puzhash, amt] for pid, amt in zip(parent_ids, amounts)]
-    merge_coin_ids = [Coin(pid, ph, amt).name() for pid, ph, amt in parent_puzhash_amounts]
+    parent_puzhash_amounts = []
+    merge_coin_ids: List[bytes32] = []
+    for pid, amt in zip(parent_ids, amounts):
+        parent_puzhash_amounts.append([pid, my_puzhash, amt])
+        merge_coin_ids.append(Coin(pid, my_puzhash, amt).name())
 
     output_parent_amount = [output_parent_id, output_coin_amount]
     output_coin_id = Coin(output_parent_id, my_puzhash, output_coin_amount).name()
@@ -750,7 +753,7 @@ def test_treasury() -> None:
     treasury_struct: Program = Program.to((SINGLETON_MOD_HASH, (treasury_id, SINGLETON_LAUNCHER_HASH)))
     CAT_TAIL_HASH = Program.to("tail").get_tree_hash()
 
-    proposal_id: Program = Program.to("singleton_id").get_tree_hash()
+    proposal_id = Program.to("singleton_id").get_tree_hash()
     proposal_struct: Program = Program.to((SINGLETON_MOD_HASH, (proposal_id, SINGLETON_LAUNCHER_HASH)))
     p2_singleton = P2_SINGLETON_MOD.curry(treasury_struct, P2_SINGLETON_AGGREGATOR_MOD)
     p2_singleton_puzhash = p2_singleton.get_tree_hash()
@@ -1229,7 +1232,7 @@ async def do_spend(
 ) -> Tuple[MempoolInclusionStatus, Optional[Err]]:
     spends = []
     for coin, puzzle, solution in zip(coins, puzzles, solutions):
-        spends.append(CoinSpend(coin, puzzle, solution))
+        spends.append(make_spend(coin, puzzle, solution))
     spend_bundle = SpendBundle(spends, AugSchemeMPL.aggregate([]))
     result = await sim_client.push_tx(spend_bundle)
     await sim.farm_block()
