@@ -10,6 +10,7 @@ from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import Program
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_record import CoinRecord
+from chia.types.spend_bundle import SpendBundle
 from chia.util.bech32m import encode_puzzle_hash
 from chia.util.ints import uint16, uint32, uint64
 from chia.wallet.conditions import Condition, ConditionValidTimes, conditions_to_json_dicts
@@ -92,7 +93,7 @@ class WalletRpcClient(RpcClient):
     async def get_height_info(self) -> uint32:
         return (await self.fetch("get_height_info", {}))["height"]
 
-    async def push_tx(self, spend_bundle):
+    async def push_tx(self, spend_bundle: SpendBundle) -> Dict[str, Any]:
         return await self.fetch("push_tx", {"spend_bundle": bytes(spend_bundle).hex()})
 
     async def push_transactions(self, txs: List[TransactionRecord]):
@@ -1140,12 +1141,10 @@ class WalletRpcClient(RpcClient):
     async def dl_track_new(self, launcher_id: bytes32) -> None:
         request = {"launcher_id": launcher_id.hex()}
         await self.fetch("dl_track_new", request)
-        return None
 
     async def dl_stop_tracking(self, launcher_id: bytes32) -> None:
         request = {"launcher_id": launcher_id.hex()}
         await self.fetch("dl_stop_tracking", request)
-        return None
 
     async def dl_latest_singleton(
         self, launcher_id: bytes32, only_confirmed: bool = False
