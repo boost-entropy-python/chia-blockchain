@@ -14,7 +14,7 @@ dependencies = [
     "chiapos==2.0.3",  # proof of space
     "clvm==0.9.8",
     "clvm_tools==0.4.7",  # Currying, Program.to, other conveniences
-    "chia_rs==0.3.3",
+    "chia_rs==0.4.0",
     "clvm-tools-rs==0.1.40",  # Rust implementation of clvm_tools' compiler
     "aiohttp==3.9.1",  # HTTP server for full node rpc
     "aiosqlite==0.19.0",  # asyncio wrapper for sqlite, to store blocks
@@ -48,7 +48,7 @@ dev_dependencies = [
     "diff-cover==8.0.1",
     "pre-commit==3.5.0; python_version < '3.9'",
     "pre-commit==3.6.0; python_version >= '3.9'",
-    "py3createtorrent==1.1.0",
+    "py3createtorrent==1.2.0",
     "pylint==3.0.3",
     "pytest==7.4.4",
     "pytest-cov==4.1.0",
