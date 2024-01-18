@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 
 dependencies = [
     "aiofiles==23.2.1",  # Async IO for files
-    "anyio==4.1.0",
+    "anyio==4.2.0",
     "boto3==1.34.11",  # AWS S3 for DL s3 plugin
     "chiavdf==1.1.1",  # timelord and vdf verification
     "chiabip158==1.3",  # bip158-style wallet filters
@@ -56,7 +56,7 @@ dev_dependencies = [
     "pytest-xdist==3.5.0",
     "pyupgrade==3.15.0",
     "twine==4.0.2",
-    "isort==5.12.0",
+    "isort==5.13.2",
     "flake8==7.0.0",
     "mypy==1.8.0",
     "black==23.12.1",
@@ -66,7 +66,7 @@ dev_dependencies = [
     "types-aiofiles==23.2.0.20240106",
     "types-cryptography==3.3.23.2",
     "types-pyyaml==6.0.12.12",
-    "types-setuptools==69.0.0.20240106",
+    "types-setuptools==69.0.0.20240115",
 ]
 
 legacy_keyring_dependencies = [
