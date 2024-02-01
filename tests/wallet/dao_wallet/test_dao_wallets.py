@@ -28,7 +28,6 @@ from chia.wallet.dao_wallet.dao_utils import (
 from chia.wallet.dao_wallet.dao_wallet import DAOWallet
 from chia.wallet.transaction_record import TransactionRecord
 from chia.wallet.util.tx_config import DEFAULT_TX_CONFIG
-from tests.conftest import ConsensusMode
 from tests.util.rpc import validate_get_routes
 from tests.util.setup_nodes import OldSimulatorsAndWallets, SimulatorsAndWalletsServices
 from tests.util.time_out_assert import time_out_assert, time_out_assert_not_none
@@ -83,9 +82,7 @@ puzzle_hash_0 = bytes32(32 * b"0")
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_creation(
-    self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_creation(self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     full_nodes, wallets, _ = two_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -134,7 +131,7 @@ async def test_dao_creation(
 
     # Try to create a DAO with more CATs than xch balance
     with pytest.raises(ValueError) as e_info:
-        dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+        await DAOWallet.create_new_dao_and_wallet(
             wallet_node_0.wallet_state_manager,
             wallet_0,
             uint64(funds + 1),
@@ -145,7 +142,7 @@ async def test_dao_creation(
         )
     assert e_info.value.args[0] == f"Your balance of {funds} mojos is not enough to create {funds + 1} CATs"
 
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_amt * 2),
@@ -156,8 +153,9 @@ async def test_dao_creation(
     )
     assert dao_wallet_0 is not None
 
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -179,14 +177,13 @@ async def test_dao_creation(
     cat_wallet_0 = dao_wallet_0.wallet_state_manager.wallets[dao_wallet_0.dao_info.cat_wallet_id]
     dao_cat_wallet_0 = dao_wallet_0.wallet_state_manager.wallets[dao_wallet_0.dao_info.dao_cat_wallet_id]
     # Some dao_cat_wallet checks for coverage
-    dao_cat_wallet_0.get_name()
+    assert dao_cat_wallet_0.get_name() == f"CAT {cat_wallet_0.cat_info.limitations_program_hash.hex()[:16]}..."
     assert (await dao_cat_wallet_0.select_coins(uint64(1), DEFAULT_TX_CONFIG)) == set()
     dao_cat_puzhash = await dao_cat_wallet_0.get_new_puzzlehash()
-    assert dao_cat_puzhash
-    dao_cat_inner = await dao_cat_wallet_0.get_new_inner_puzzle(DEFAULT_TX_CONFIG)
-    assert dao_cat_inner
+    assert dao_cat_puzhash == bytes32.from_hexstr("09f905ba3e9db3644ac4537495565bf268c6f030266aa412863c5efced6b1800")
+    await dao_cat_wallet_0.get_new_inner_puzzle(DEFAULT_TX_CONFIG)
     dao_cat_inner_hash = await dao_cat_wallet_0.get_new_inner_hash(DEFAULT_TX_CONFIG)
-    assert dao_cat_inner_hash
+    assert dao_cat_inner_hash == bytes32.from_hexstr("8a66292fde9ef08198d996eae0ea21677eb478afeabed8030b1bf42c728f7dcc")
 
     cat_wallet_0_bal = await cat_wallet_0.get_confirmed_balance()
     assert cat_wallet_0_bal == cat_amt * 2
@@ -263,9 +260,7 @@ async def test_dao_creation(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_funding(
-    self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_funding(self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     full_nodes, wallets, _ = three_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -319,7 +314,7 @@ async def test_dao_funding(
         proposal_minimum_amount=uint64(1),
     )
 
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_amt),
@@ -331,8 +326,9 @@ async def test_dao_funding(
     treasury_id = dao_wallet_0.dao_info.treasury_id
 
     # Get the full node sim to process the wallet creation spend
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -428,9 +424,7 @@ async def test_dao_funding(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_proposals(
-    self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_proposals(self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     """
     Test a set of proposals covering:
     - the spend, update, and mint types.
@@ -508,7 +502,7 @@ async def test_dao_proposals(
     # Create the DAO.
     # This takes two steps: create the treasury singleton, wait for oracle_spend_delay and
     # then complete the eve spend
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_issuance),
@@ -517,8 +511,9 @@ async def test_dao_proposals(
     )
     assert dao_wallet_0 is not None
 
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -905,7 +900,7 @@ async def test_dao_proposals(
 )
 @pytest.mark.anyio
 async def test_dao_proposal_partial_vote(
-    self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
+    self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool
 ) -> None:
     full_nodes, wallets, _ = two_wallet_nodes
     full_node_api = full_nodes[0]
@@ -951,7 +946,7 @@ async def test_dao_proposal_partial_vote(
         proposal_minimum_amount=uint64(1),
     )
 
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_amt),
@@ -961,8 +956,9 @@ async def test_dao_proposal_partial_vote(
     assert dao_wallet_0 is not None
 
     # Get the full node sim to process the wallet creation spend
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -1143,9 +1139,7 @@ async def test_dao_proposal_partial_vote(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_rpc_api(
-    self_hostname: str, two_wallet_nodes: Any, trusted: Any, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_rpc_api(self_hostname: str, two_wallet_nodes: Any, trusted: Any) -> None:
     full_nodes, wallets, _ = two_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -1649,10 +1643,7 @@ async def test_dao_rpc_api(
 )
 @pytest.mark.anyio
 async def test_dao_rpc_client(
-    two_wallet_nodes_services: SimulatorsAndWalletsServices,
-    trusted: bool,
-    self_hostname: str,
-    consensus_mode: ConsensusMode,
+    two_wallet_nodes_services: SimulatorsAndWalletsServices, trusted: bool, self_hostname: str
 ) -> None:
     [full_node_service], wallet_services, bt = two_wallet_nodes_services
     full_node_api = full_node_service._api
@@ -2059,10 +2050,7 @@ async def test_dao_rpc_client(
 )
 @pytest.mark.anyio
 async def test_dao_complex_spends(
-    two_wallet_nodes_services: SimulatorsAndWalletsServices,
-    trusted: bool,
-    self_hostname: str,
-    consensus_mode: ConsensusMode,
+    two_wallet_nodes_services: SimulatorsAndWalletsServices, trusted: bool, self_hostname: str
 ) -> None:
     [full_node_service], wallet_services, bt = two_wallet_nodes_services
     full_node_api = full_node_service._api
@@ -2453,9 +2441,7 @@ async def test_dao_complex_spends(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_concurrency(
-    self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_concurrency(self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     full_nodes, wallets, _ = three_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -2509,7 +2495,7 @@ async def test_dao_concurrency(
         proposal_minimum_amount=uint64(101),
     )
 
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_amt),
@@ -2519,8 +2505,9 @@ async def test_dao_concurrency(
     assert dao_wallet_0 is not None
 
     # Get the full node sim to process the wallet creation spend
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -2679,10 +2666,7 @@ async def test_dao_concurrency(
 )
 @pytest.mark.anyio
 async def test_dao_cat_exits(
-    two_wallet_nodes_services: SimulatorsAndWalletsServices,
-    trusted: bool,
-    self_hostname: str,
-    consensus_mode: ConsensusMode,
+    two_wallet_nodes_services: SimulatorsAndWalletsServices, trusted: bool, self_hostname: str
 ) -> None:
     [full_node_service], wallet_services, bt = two_wallet_nodes_services
     full_node_api = full_node_service._api
@@ -2874,9 +2858,7 @@ async def test_dao_cat_exits(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_reorgs(
-    self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_reorgs(self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     full_nodes, wallets, _ = two_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -2921,7 +2903,7 @@ async def test_dao_reorgs(
         proposal_minimum_amount=uint64(101),
     )
 
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_amt),
@@ -2931,8 +2913,9 @@ async def test_dao_reorgs(
     assert dao_wallet_0 is not None
 
     # Get the full node sim to process the wallet creation spend
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -3126,9 +3109,7 @@ async def test_dao_reorgs(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_votes(
-    self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_votes(self_hostname: str, three_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     full_nodes, wallets, _ = three_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -3187,7 +3168,7 @@ async def test_dao_votes(
         proposal_minimum_amount=proposal_min_amt,
     )
 
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_issuance),
@@ -3196,8 +3177,9 @@ async def test_dao_votes(
     )
     assert dao_wallet_0 is not None
 
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_node_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -3356,9 +3338,7 @@ async def test_dao_votes(
     [True, False],
 )
 @pytest.mark.anyio
-async def test_dao_resync(
-    self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool, consensus_mode: ConsensusMode
-) -> None:
+async def test_dao_resync(self_hostname: str, two_wallet_nodes: OldSimulatorsAndWallets, trusted: bool) -> None:
     full_nodes, wallets, _ = two_wallet_nodes
     full_node_api = full_nodes[0]
     full_node_server = full_node_api.server
@@ -3406,7 +3386,7 @@ async def test_dao_resync(
 
     fee = uint64(10)
     fee_for_cat = uint64(20)
-    dao_wallet_0 = await DAOWallet.create_new_dao_and_wallet(
+    dao_wallet_0, tx_queue = await DAOWallet.create_new_dao_and_wallet(
         wallet_node_0.wallet_state_manager,
         wallet_0,
         uint64(cat_amt * 2),
@@ -3417,8 +3397,9 @@ async def test_dao_resync(
     )
     assert dao_wallet_0 is not None
 
-    txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
+    for tx in tx_queue:
+        await wallet_0.wallet_state_manager.add_pending_transaction(tx)
+    await full_node_api.wait_transaction_records_entered_mempool(records=tx_queue, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
