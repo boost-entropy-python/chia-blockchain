@@ -22,7 +22,7 @@ dependencies = [
     "colorama==0.4.6",  # Colorizes terminal output
     "colorlog==6.8.2",  # Adds color to logs
     "concurrent-log-handler==0.9.25",  # Concurrently log and rotate logs
-    "cryptography==42.0.2",  # Python cryptography library for TLS - keyring conflict
+    "cryptography==42.0.4",  # Python cryptography library for TLS - keyring conflict
     "filelock==3.13.1",  # For reading and writing config multiprocess and multithread safely  (non-reentrant locks)
     "keyring==24.3.0",  # Store keys in MacOS Keychain, Windows Credential Locker
     "PyYAML==6.0.1",  # Used for config file format
@@ -50,7 +50,7 @@ dev_dependencies = [
     "pre-commit==3.6.0; python_version >= '3.9'",
     "py3createtorrent==1.2.0",
     "pylint==3.0.3",
-    "pytest==8.0.0",
+    "pytest==8.0.1",
     "pytest-cov==4.1.0",
     "pytest-mock==3.12.0",
     "pytest-xdist==3.5.0",
