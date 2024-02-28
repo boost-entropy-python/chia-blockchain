@@ -32,7 +32,7 @@ dependencies = [
     "dnspython==2.5.0",  # Query DNS seeds
     "watchdog==2.2.0",  # Filesystem event watching - watches keyring.yaml
     "dnslib==0.9.24",  # dns lib
-    "typing-extensions==4.9.0",  # typing backports like Protocol and TypedDict
+    "typing-extensions==4.10.0",  # typing backports like Protocol and TypedDict
     "zstd==1.5.5.1",
     "packaging==23.2",
     "psutil==5.9.4",
@@ -45,12 +45,12 @@ upnp_dependencies = [
 dev_dependencies = [
     "build==1.0.3",
     "coverage==7.4.1",
-    "diff-cover==8.0.1",
+    "diff-cover==8.0.3",
     "pre-commit==3.5.0; python_version < '3.9'",
     "pre-commit==3.6.0; python_version >= '3.9'",
     "py3createtorrent==1.2.0",
     "pylint==3.0.3",
-    "pytest==8.0.1",
+    "pytest==8.0.2",
     "pytest-cov==4.1.0",
     "pytest-mock==3.12.0",
     "pytest-xdist==3.5.0",
