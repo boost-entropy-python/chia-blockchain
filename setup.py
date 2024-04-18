@@ -32,7 +32,7 @@ dependencies = [
     "dnspython==2.6.1",  # Query DNS seeds
     "watchdog==4.0.0",  # Filesystem event watching - watches keyring.yaml
     "dnslib==0.9.24",  # dns lib
-    "typing-extensions==4.10.0",  # typing backports like Protocol and TypedDict
+    "typing-extensions==4.11.0",  # typing backports like Protocol and TypedDict
     "zstd==1.5.5.1",
     "packaging==23.2",
     "psutil==5.9.4",
@@ -49,7 +49,7 @@ dev_dependencies = [
     "pre-commit==3.5.0; python_version < '3.9'",
     "pre-commit==3.6.2; python_version >= '3.9'",
     "py3createtorrent==1.2.0",
-    "pylint==3.0.3",
+    "pylint==3.1.0",
     "pytest==8.1.1",
     "pytest-cov==4.1.0",
     "pytest-mock==3.14.0",
