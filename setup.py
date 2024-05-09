@@ -8,7 +8,7 @@ from setuptools import find_packages, setup
 dependencies = [
     "aiofiles==23.2.1",  # Async IO for files
     "anyio==4.3.0",
-    "boto3==1.34.46",  # AWS S3 for DL s3 plugin
+    "boto3==1.34.100",  # AWS S3 for DL s3 plugin
     "chiavdf==1.1.4",  # timelord and vdf verification
     "chiabip158==1.5.1",  # bip158-style wallet filters
     "chiapos==2.0.4",  # proof of space
@@ -63,7 +63,7 @@ dev_dependencies = [
     "black==24.2.0",
     "lxml==5.1.0",
     "aiohttp_cors==0.7.0",  # For blackd
-    "pyinstaller==6.5.0",
+    "pyinstaller==6.6.0",
     "types-aiofiles==23.2.0.20240311",
     "types-cryptography==3.3.23.2",
     "types-pyyaml==6.0.12.12",
