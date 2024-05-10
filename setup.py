@@ -59,14 +59,14 @@ dev_dependencies = [
     "twine==5.0.0",
     "isort==5.13.2",
     "flake8==7.0.0",
-    "mypy==1.8.0",
+    "mypy==1.10.0",
     "black==24.2.0",
     "lxml==5.1.0",
     "aiohttp_cors==0.7.0",  # For blackd
     "pyinstaller==6.6.0",
     "types-aiofiles==23.2.0.20240311",
     "types-cryptography==3.3.23.2",
-    "types-pyyaml==6.0.12.12",
+    "types-pyyaml==6.0.12.20240311",
     "types-setuptools==69.1.0.20240310",
 ]
 
