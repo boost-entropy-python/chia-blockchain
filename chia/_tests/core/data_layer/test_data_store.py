@@ -14,8 +14,6 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple, c
 
 import aiohttp
 import aiosqlite
-import big_o
-import big_o.complexities
 import pytest
 
 from chia._tests.core.data_layer.util import Example, add_0123_example, add_01234567_example
@@ -1517,89 +1515,16 @@ async def test_clear_pending_roots_returns_root(
     assert cleared_root == pending_root
 
 
-@pytest.mark.anyio
-async def test_benchmark_batch_insert_speed(
-    data_store: DataStore,
-    store_id: bytes32,
-    benchmark_runner: BenchmarkRunner,
-) -> None:
-    r = random.Random()
-    r.seed("shadowlands", version=2)
+@dataclass
+class BatchInsertBenchmarkCase:
+    pre: int
+    count: int
+    limit: float
+    marks: Marks = ()
 
-    test_size = 100
-    max_pre_size = 20_000
-    # may not be needed if big_o already considers the effect
-    # TODO: must be > 0 to avoid an issue with the log class?
-    lowest_considered_n = 2000
-    simplicity_bias_percentage = 10 / 100
-
-    batch_count, remainder = divmod(max_pre_size, test_size)
-    assert remainder == 0, "the last batch would be a different size"
-
-    changelist = [
-        {
-            "action": "insert",
-            "key": x.to_bytes(32, byteorder="big", signed=False),
-            "value": bytes(r.getrandbits(8) for _ in range(1200)),
-        }
-        for x in range(max_pre_size)
-    ]
-
-    pre = changelist[:max_pre_size]
-
-    records: Dict[int, float] = {}
-
-    total_inserted = 0
-    pre_iter = iter(pre)
-    with benchmark_runner.print_runtime(
-        label="overall",
-        clock=time.monotonic,
-    ):
-        while True:
-            pre_batch = list(itertools.islice(pre_iter, test_size))
-            if len(pre_batch) == 0:
-                break
-
-            with benchmark_runner.print_runtime(
-                label="count",
-                clock=time.monotonic,
-            ) as f:
-                await data_store.insert_batch(
-                    store_id=store_id,
-                    changelist=pre_batch,
-                    # TODO: does this mess up test accuracy?
-                    status=Status.COMMITTED,
-                )
-
-            records[total_inserted] = f.result().duration
-            total_inserted += len(pre_batch)
-
-    considered_durations = {n: duration for n, duration in records.items() if n >= lowest_considered_n}
-    ns = list(considered_durations.keys())
-    durations = list(considered_durations.values())
-    best_class, fitted = big_o.infer_big_o_class(ns=ns, time=durations)
-    simplicity_bias = simplicity_bias_percentage * fitted[best_class]
-    best_class, fitted = big_o.infer_big_o_class(ns=ns, time=durations, simplicity_bias=simplicity_bias)
-
-    print(f"allowed simplicity bias: {simplicity_bias}")
-    print(big_o.reports.big_o_report(best=best_class, others=fitted))
-
-    assert isinstance(
-        best_class, (big_o.complexities.Constant, big_o.complexities.Linear)
-    ), f"must be constant or linear: {best_class}"
-
-    coefficient_maximums = [0.65, 0.000_25, *(10**-n for n in range(5, 100))]
-
-    coefficients = best_class.coefficients()
-    paired = list(zip(coefficients, coefficient_maximums))
-    assert len(paired) == len(coefficients)
-    for index, [actual, maximum] in enumerate(paired):
-        benchmark_runner.record_value(
-            value=actual,
-            limit=maximum,
-            label=f"{type(best_class).__name__} coefficient {index}",
-        )
-        assert actual <= maximum, f"(coefficient {index}) {actual} > {maximum}: {paired}"
+    @property
+    def id(self) -> str:
+        return f"pre={self.pre},count={self.count}"
 
 
 @dataclass
@@ -1612,6 +1537,69 @@ class BatchesInsertBenchmarkCase:
     @property
     def id(self) -> str:
         return f"count={self.count},batch_count={self.batch_count}"
+
+
+@datacases(
+    BatchInsertBenchmarkCase(
+        pre=0,
+        count=100,
+        limit=2.2,
+    ),
+    BatchInsertBenchmarkCase(
+        pre=1_000,
+        count=100,
+        limit=4,
+    ),
+    BatchInsertBenchmarkCase(
+        pre=0,
+        count=1_000,
+        limit=30,
+    ),
+    BatchInsertBenchmarkCase(
+        pre=1_000,
+        count=1_000,
+        limit=36,
+    ),
+    BatchInsertBenchmarkCase(
+        pre=10_000,
+        count=25_000,
+        limit=52,
+    ),
+)
+@pytest.mark.anyio
+async def test_benchmark_batch_insert_speed(
+    data_store: DataStore,
+    store_id: bytes32,
+    benchmark_runner: BenchmarkRunner,
+    case: BatchInsertBenchmarkCase,
+) -> None:
+    r = random.Random()
+    r.seed("shadowlands", version=2)
+
+    changelist = [
+        {
+            "action": "insert",
+            "key": x.to_bytes(32, byteorder="big", signed=False),
+            "value": bytes(r.getrandbits(8) for _ in range(1200)),
+        }
+        for x in range(case.pre + case.count)
+    ]
+
+    pre = changelist[: case.pre]
+    batch = changelist[case.pre : case.pre + case.count]
+
+    if case.pre > 0:
+        await data_store.insert_batch(
+            store_id=store_id,
+            changelist=pre,
+            status=Status.COMMITTED,
+        )
+
+    with benchmark_runner.assert_runtime(seconds=case.limit):
+        await data_store.insert_batch(
+            store_id=store_id,
+            changelist=batch,
+        )
 
 
 @datacases(
@@ -2159,3 +2147,131 @@ async def test_sparse_ancestor_table(data_store: DataStore, store_id: bytes32) -
 
     assert current_generation_count == 15
     assert previous_generation_count == 184
+
+
+async def get_all_nodes(data_store: DataStore, store_id: bytes32) -> List[Node]:
+    root = await data_store.get_tree_root(store_id)
+    assert root.node_hash is not None
+    root_node = await data_store.get_node(root.node_hash)
+    nodes: List[Node] = []
+    queue: List[Node] = [root_node]
+
+    while len(queue) > 0:
+        node = queue.pop(0)
+        nodes.append(node)
+        if isinstance(node, InternalNode):
+            left_node = await data_store.get_node(node.left_hash)
+            right_node = await data_store.get_node(node.right_hash)
+            queue.append(left_node)
+            queue.append(right_node)
+
+    return nodes
+
+
+@pytest.mark.anyio
+async def test_get_nodes(data_store: DataStore, store_id: bytes32) -> None:
+    num_values = 50
+    changelist: List[Dict[str, Any]] = []
+
+    for value in range(num_values):
+        value_bytes = value.to_bytes(4, byteorder="big")
+        changelist.append({"action": "upsert", "key": value_bytes, "value": value_bytes})
+    await data_store.insert_batch(
+        store_id=store_id,
+        changelist=changelist,
+        status=Status.COMMITTED,
+    )
+
+    expected_nodes = await get_all_nodes(data_store, store_id)
+    nodes = await data_store.get_nodes([node.hash for node in expected_nodes])
+    assert nodes == expected_nodes
+
+    node_hash = bytes32([0] * 32)
+    node_hash_2 = bytes32([0] * 31 + [1])
+    with pytest.raises(Exception, match=f"^Nodes not found for hashes: {node_hash.hex()}, {node_hash_2.hex()}"):
+        await data_store.get_nodes([node_hash, node_hash_2] + [node.hash for node in expected_nodes])
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("pre", [0, 2048])
+@pytest.mark.parametrize("batch_size", [25, 100, 500])
+async def test_get_leaf_at_minimum_height(
+    data_store: DataStore,
+    store_id: bytes32,
+    pre: int,
+    batch_size: int,
+) -> None:
+    num_values = 1000
+    value_offset = 1000000
+    all_min_leafs: Set[TerminalNode] = set()
+
+    if pre > 0:
+        # This builds a complete binary tree, in order to test more than one batch in the queue before finding the leaf
+        changelist: List[Dict[str, Any]] = []
+
+        for value in range(pre):
+            value_bytes = (value * value).to_bytes(8, byteorder="big")
+            changelist.append({"action": "upsert", "key": value_bytes, "value": value_bytes})
+        await data_store.insert_batch(
+            store_id=store_id,
+            changelist=changelist,
+            status=Status.COMMITTED,
+        )
+
+    for value in range(num_values):
+        value_bytes = value.to_bytes(4, byteorder="big")
+        # Use autoinsert instead of `insert_batch` to get a more randomly shaped tree
+        await data_store.autoinsert(
+            key=value_bytes,
+            value=value_bytes,
+            store_id=store_id,
+            status=Status.COMMITTED,
+        )
+
+        if (value + 1) % batch_size == 0:
+            hash_to_parent: Dict[bytes32, InternalNode] = {}
+            root = await data_store.get_tree_root(store_id)
+            assert root.node_hash is not None
+            min_leaf = await data_store.get_leaf_at_minimum_height(root.node_hash, hash_to_parent)
+            all_nodes = await get_all_nodes(data_store, store_id)
+            heights: Dict[bytes32, int] = {}
+            heights[root.node_hash] = 0
+            min_leaf_height = None
+
+            for node in all_nodes:
+                if isinstance(node, InternalNode):
+                    heights[node.left_hash] = heights[node.hash] + 1
+                    heights[node.right_hash] = heights[node.hash] + 1
+                else:
+                    if min_leaf_height is not None:
+                        min_leaf_height = min(min_leaf_height, heights[node.hash])
+                    else:
+                        min_leaf_height = heights[node.hash]
+
+            assert min_leaf_height is not None
+            if pre > 0:
+                assert min_leaf_height >= 11
+            for node in all_nodes:
+                if isinstance(node, TerminalNode):
+                    assert node == min_leaf
+                    assert heights[min_leaf.hash] == min_leaf_height
+                    break
+                if node.left_hash in hash_to_parent:
+                    assert hash_to_parent[node.left_hash] == node
+                if node.right_hash in hash_to_parent:
+                    assert hash_to_parent[node.right_hash] == node
+
+            # Push down the min height leaf, so on the next iteration we get a different leaf
+            pushdown_height = 20
+            for repeat in range(pushdown_height):
+                value_bytes = (value + (repeat + 1) * value_offset).to_bytes(4, byteorder="big")
+                await data_store.insert(
+                    key=value_bytes,
+                    value=value_bytes,
+                    store_id=store_id,
+                    reference_node_hash=min_leaf.hash,
+                    side=Side.RIGHT,
+                    status=Status.COMMITTED,
+                )
+            assert min_leaf not in all_min_leafs
+            all_min_leafs.add(min_leaf)
