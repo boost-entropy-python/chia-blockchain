@@ -107,7 +107,7 @@ def make_item(
     return MempoolItem(
         SpendBundle([], G2Element()),
         fee,
-        NPCResult(None, SpendBundleConditions([], 0, 0, 0, None, None, [], cost, 0, 0)),
+        SpendBundleConditions([], 0, 0, 0, None, None, [], cost, 0, 0),
         spend_bundle_name,
         uint32(0),
         assert_height,
@@ -699,7 +699,7 @@ class TestMempoolManager:
 
         sb: SpendBundle = generate_test_spend_bundle(wallet_a, coin1)
         assert sb.aggregated_signature != G2Element.generator()
-        sb = dataclasses.replace(sb, aggregated_signature=G2Element.generator())
+        sb = sb.replace(aggregated_signature=G2Element.generator())
         res: Optional[Message] = await send_sb(full_node_1, sb)
         assert res is not None
         ack: TransactionAck = TransactionAck.from_bytes(res.data)
