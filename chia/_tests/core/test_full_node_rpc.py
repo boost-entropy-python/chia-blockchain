@@ -9,6 +9,7 @@ from chia import __version__
 from chia._tests.blockchain.blockchain_test_utils import _validate_and_add_block
 from chia._tests.conftest import ConsensusMode
 from chia._tests.connection_utils import connect_and_get_peer
+from chia._tests.util.misc import add_blocks_in_batches
 from chia._tests.util.rpc import validate_get_routes
 from chia._tests.util.time_out_assert import time_out_assert
 from chia.consensus.block_record import BlockRecord
@@ -535,8 +536,7 @@ async def test_signage_points(two_nodes_sim_and_wallets_services, empty_blockcha
 
         # Perform a reorg
         blocks = bt.get_consecutive_blocks(12, seed=b"1234")
-        for block in blocks:
-            await full_node_api_1.full_node.add_block(block)
+        await add_blocks_in_batches(blocks, full_node_api_1.full_node)
 
         # Signage point is no longer in the blockchain
         res = await client.get_recent_signage_point_or_eos(sp.cc_vdf.output.get_hash(), None)
@@ -711,7 +711,7 @@ async def test_coin_name_not_found_in_mempool(one_node, self_hostname):
             full_node_service.config,
         )
 
-        empty_coin_name = bytes32([0] * 32)
+        empty_coin_name = bytes32.zeros
         mempool_item = await client.get_mempool_items_by_coin_name(empty_coin_name)
         assert mempool_item["success"] == True
         assert "mempool_items" in mempool_item
