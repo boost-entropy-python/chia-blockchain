@@ -20,11 +20,11 @@ from chia._tests.connection_utils import add_dummy_connection, connect_and_get_p
 from chia._tests.core.full_node.stores.test_coin_store import get_future_reward_coins
 from chia._tests.core.make_block_generator import make_spend_bundle
 from chia._tests.core.node_height import node_height_at_least
-from chia._tests.util.misc import add_blocks_in_batches, wallet_height_at_least
+from chia._tests.util.misc import wallet_height_at_least
 from chia._tests.util.setup_nodes import SimulatorsAndWalletsServices
 from chia._tests.util.time_out_assert import time_out_assert, time_out_assert_custom_interval, time_out_messages
 from chia.consensus.block_body_validation import ForkInfo
-from chia.consensus.multiprocess_validation import pre_validate_blocks_multiprocessing
+from chia.consensus.multiprocess_validation import PreValidationResult, pre_validate_blocks_multiprocessing
 from chia.consensus.pot_iterations import is_overflow_block
 from chia.full_node.full_node import WalletUpdate
 from chia.full_node.full_node_api import FullNodeAPI
@@ -40,6 +40,7 @@ from chia.protocols.wallet_protocol import SendTransaction, TransactionAck
 from chia.server.address_manager import AddressManager
 from chia.server.outbound_message import Message, NodeType
 from chia.server.server import ChiaServer
+from chia.simulator.add_blocks_in_batches import add_blocks_in_batches
 from chia.simulator.block_tools import BlockTools, create_block_tools_async, get_signage_point, make_unfinished_block
 from chia.simulator.full_node_simulator import FullNodeSimulator
 from chia.simulator.keyring import TempKeyring
@@ -62,6 +63,7 @@ from chia.types.peer_info import PeerInfo, TimestampedPeerInfo
 from chia.types.spend_bundle import SpendBundle, estimate_fees
 from chia.types.unfinished_block import UnfinishedBlock
 from chia.types.validation_state import ValidationState
+from chia.util.augmented_chain import AugmentedBlockchain
 from chia.util.errors import ConsensusError, Err
 from chia.util.hash import std_hash
 from chia.util.ints import uint8, uint16, uint32, uint64, uint128
@@ -429,15 +431,16 @@ class TestFullNodeBlockCompression:
                 for reorg_block in reog_blocks[:r]:
                     await _validate_and_add_block_no_error(blockchain, reorg_block, fork_info=fork_info)
                 for i in range(1, height):
-                    results = await pre_validate_blocks_multiprocessing(
+                    futures = await pre_validate_blocks_multiprocessing(
                         blockchain.constants,
-                        blockchain,
+                        AugmentedBlockchain(blockchain),
                         all_blocks[:i],
                         blockchain.pool,
                         {},
                         ValidationState(ssi, diff, None),
                         validate_signatures=False,
                     )
+                    results: list[PreValidationResult] = list(await asyncio.gather(*futures))
                     assert results is not None
                     for result in results:
                         assert result.error is None
@@ -447,15 +450,16 @@ class TestFullNodeBlockCompression:
                 for block in all_blocks[:r]:
                     await _validate_and_add_block_no_error(blockchain, block, fork_info=fork_info)
                 for i in range(1, height):
-                    results = await pre_validate_blocks_multiprocessing(
+                    futures = await pre_validate_blocks_multiprocessing(
                         blockchain.constants,
-                        blockchain,
+                        AugmentedBlockchain(blockchain),
                         all_blocks[:i],
                         blockchain.pool,
                         {},
                         ValidationState(ssi, diff, None),
                         validate_signatures=False,
                     )
+                    results: list[PreValidationResult] = list(await asyncio.gather(*futures))
                     assert results is not None
                     for result in results:
                         assert result.error is None

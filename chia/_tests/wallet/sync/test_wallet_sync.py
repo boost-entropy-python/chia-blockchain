@@ -15,7 +15,7 @@ from colorlog import getLogger
 
 from chia._tests.connection_utils import disconnect_all, disconnect_all_and_reconnect
 from chia._tests.util.blockchain_mock import BlockchainMock
-from chia._tests.util.misc import add_blocks_in_batches, wallet_height_at_least
+from chia._tests.util.misc import wallet_height_at_least
 from chia._tests.util.setup_nodes import OldSimulatorsAndWallets
 from chia._tests.util.time_out_assert import time_out_assert, time_out_assert_not_none
 from chia._tests.weight_proof.test_weight_proof import load_blocks_dont_validate
@@ -37,12 +37,14 @@ from chia.protocols.wallet_protocol import (
 )
 from chia.server.outbound_message import Message, make_msg
 from chia.server.ws_connection import WSChiaConnection
+from chia.simulator.add_blocks_in_batches import add_blocks_in_batches
 from chia.simulator.simulator_protocol import FarmNewBlockProtocol
 from chia.types.blockchain_format.program import Program
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.full_block import FullBlock
 from chia.types.peer_info import PeerInfo
 from chia.types.validation_state import ValidationState
+from chia.util.augmented_chain import AugmentedBlockchain
 from chia.util.hash import std_hash
 from chia.util.ints import uint32, uint64, uint128
 from chia.wallet.nft_wallet.nft_wallet import NFTWallet
@@ -363,6 +365,7 @@ async def test_long_sync_wallet(
     )
     fork_height = blocks_reorg[-num_blocks - 10].height - 1
     await full_node.add_block_batch(
+        AugmentedBlockchain(full_node.blockchain),
         blocks_reorg[-num_blocks - 10 : -1],
         PeerInfo("0.0.0.0", 0),
         ForkInfo(fork_height, fork_height, blocks_reorg[-num_blocks - 10].prev_header_hash),
@@ -480,6 +483,7 @@ async def test_wallet_reorg_get_coinbase(
         full_node.constants, True, block_record, full_node.blockchain
     )
     await full_node.add_block_batch(
+        AugmentedBlockchain(full_node.blockchain),
         blocks_reorg_2[-44:],
         PeerInfo("0.0.0.0", 0),
         ForkInfo(blocks_reorg_2[-45].height, blocks_reorg_2[-45].height, blocks_reorg_2[-45].header_hash),
