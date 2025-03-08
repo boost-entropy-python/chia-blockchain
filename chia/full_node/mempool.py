@@ -19,7 +19,7 @@ from chia.full_node.fee_estimator_interface import FeeEstimatorInterface
 from chia.types.blockchain_format.serialized_program import SerializedProgram
 from chia.types.clvm_cost import CLVMCost
 from chia.types.coin_spend import CoinSpend
-from chia.types.eligible_coin_spends import EligibleCoinSpends, UnspentLineageInfo
+from chia.types.eligible_coin_spends import EligibleCoinSpends, SkipDedup, UnspentLineageInfo
 from chia.types.generator_types import BlockGenerator
 from chia.types.internal_mempool_item import InternalMempoolItem
 from chia.types.mempool_item import MempoolItem
@@ -452,10 +452,20 @@ class Mempool:
                     item.fee / item.cost,
                 ),
             )
-            all_coin_spends = [(s.coin_id, item.name) for s in item.conds.spends]
-            conn.executemany("INSERT INTO spends VALUES(?, ?)", all_coin_spends)
+            all_coin_spends = []
+            # item.name is a property
+            # only compute its name once (the spend bundle name)
+            item_name = item.name
+            for coin_id, bcs in item.bundle_coin_spends.items():
+                # any FF spend should be indexed by its latest singleton coin
+                # ID, this way we'll find it when the singleton is spent
+                if bcs.latest_singleton_coin is not None:
+                    all_coin_spends.append((bcs.latest_singleton_coin, item_name))
+                else:
+                    all_coin_spends.append((coin_id, item_name))
+            conn.executemany("INSERT OR IGNORE INTO spends VALUES(?, ?)", all_coin_spends)
 
-        self._items[item.name] = InternalMempoolItem(
+        self._items[item_name] = InternalMempoolItem(
             item.spend_bundle, item.conds, item.height_added_to_mempool, item.bundle_coin_spends
         )
         self._total_cost += item.cost
@@ -464,6 +474,11 @@ class Mempool:
         info = FeeMempoolInfo(self.mempool_info, self.total_mempool_cost(), self.total_mempool_fees(), datetime.now())
         self.fee_estimator.add_mempool_item(info, MempoolItemInfo(item.cost, item.fee, item.height_added_to_mempool))
         return MempoolAddInfo(removals, None)
+
+    # each tuple holds new_coin_id, current_coin_id, mempool item name
+    def update_spend_index(self, spends_to_update: list[tuple[bytes32, bytes32, bytes32]]) -> None:
+        with self._db_conn as conn:
+            conn.executemany("UPDATE OR REPLACE spends SET coin_id=? WHERE coin_id=? AND tx=?", spends_to_update)
 
     def at_full_capacity(self, cost: int) -> bool:
         """
@@ -558,11 +573,18 @@ class Mempool:
                     # we want to keep looking for smaller transactions that
                     # might fit, but we also want to avoid spending too much
                     # time on potentially expensive ones, hence this shortcut.
+                    if any(
+                        map(
+                            lambda spend_data: (spend_data.eligible_for_dedup or spend_data.eligible_for_fast_forward),
+                            item.bundle_coin_spends.values(),
+                        )
+                    ):
+                        log.info("Skipping transaction with dedup or FF spends {item.name}")
+                        continue
+
                     unique_coin_spends = []
                     unique_additions = []
                     for spend_data in item.bundle_coin_spends.values():
-                        if spend_data.eligible_for_dedup or spend_data.eligible_for_fast_forward:
-                            raise Exception(f"Skipping transaction with eligible coin(s): {name.hex()}")
                         unique_coin_spends.append(spend_data.coin_spend)
                         unique_additions.extend(spend_data.additions)
                     cost_saving = 0
@@ -610,8 +632,12 @@ class Mempool:
                 # find transactions small enough to fit at this point
                 if self.mempool_info.max_block_clvm_cost - cost_sum < MIN_COST_THRESHOLD:
                     break
+            except SkipDedup as e:
+                log.info(f"{e}")
+                continue
             except Exception as e:
                 log.info(f"Exception while checking a mempool item for deduplication: {e}")
+                skipped_items += 1
                 continue
         if processed_spend_bundles == 0:
             return None
