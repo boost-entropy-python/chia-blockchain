@@ -15,8 +15,10 @@ from chia_rs import (
     AugSchemeMPL,
     BlockBuilder,
     Coin,
+    CoinSpend,
     ConsensusConstants,
     G2Element,
+    SpendBundle,
     get_flags_for_height_and_constants,
     run_block_generator2,
     solution_generator_backrefs,
@@ -29,7 +31,6 @@ from chia.full_node.fee_estimation import FeeMempoolInfo, MempoolInfo, MempoolIt
 from chia.full_node.fee_estimator_interface import FeeEstimatorInterface
 from chia.types.blockchain_format.serialized_program import SerializedProgram
 from chia.types.clvm_cost import CLVMCost
-from chia.types.coin_spend import CoinSpend
 from chia.types.eligible_coin_spends import (
     IdenticalSpendDedup,
     SingletonFastForward,
@@ -39,7 +40,6 @@ from chia.types.eligible_coin_spends import (
 from chia.types.generator_types import NewBlockGenerator
 from chia.types.internal_mempool_item import InternalMempoolItem
 from chia.types.mempool_item import MempoolItem
-from chia.types.spend_bundle import SpendBundle
 from chia.util.batches import to_batches
 from chia.util.db_wrapper import SQLITE_MAX_VARIABLE_NUMBER
 from chia.util.errors import Err
@@ -615,7 +615,7 @@ class Mempool:
                     if any(
                         sd.eligible_for_dedup or sd.eligible_for_fast_forward for sd in item.bundle_coin_spends.values()
                     ):
-                        log.info("Skipping transaction with dedup or FF spends {item.name}")
+                        log.info(f"Skipping transaction with dedup or FF spends {item.spend_bundle.name()}")
                         continue
 
                     unique_coin_spends = []
