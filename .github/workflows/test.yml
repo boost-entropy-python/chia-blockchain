@@ -128,6 +128,7 @@ jobs:
       runs-on: macos-15-intel
       arch: intel
       arch-emoji: 🌀
+      collect-junit: false
   macos-arm:
     if: github.event_name != 'workflow_dispatch' || inputs.run-macos-arm
     uses: ./.github/workflows/test-single.yml
@@ -255,7 +256,7 @@ jobs:
 
       - name: Publish formatted JUnit data
         if: false
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: junit-data
           path: junit-data/*
@@ -288,7 +289,7 @@ jobs:
 
       - name: Publish JUnit results
         if: always() && steps.alls-green.outputs.success == 'true' && false
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: junit-results
           path: junit-results/*
@@ -413,7 +414,7 @@ jobs:
 
       - name: Publish coverage reports
         if: always() && steps.alls-green.outputs.success == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-reports
           path: coverage-reports/*
