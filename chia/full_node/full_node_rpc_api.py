@@ -11,7 +11,7 @@ from chia_rs import (
     BlockRecord,
     CoinSpend,
     FullBlock,
-    PlotSize,
+    PlotParam,
     SpendBundle,
     SpendBundleConditions,
     get_flags_for_height_and_constants,
@@ -606,7 +606,7 @@ class FullNodeRpcApi:
 
         # TODO: todo_v2_plots Update this calculation to take v2 plots into
         # account
-        plot_filter_size = calculate_prefix_bits(self.service.constants, newer_block.height, PlotSize.make_v1(32))
+        plot_filter_size = calculate_prefix_bits(self.service.constants, newer_block.height, PlotParam.make_v1(32))
         delta_iters = newer_block.total_iters - older_block.total_iters
         weight_div_iters = delta_weight / delta_iters
         additional_difficulty_constant = self.service.constants.DIFFICULTY_CONSTANT_FACTOR
@@ -998,7 +998,7 @@ class FullNodeRpcApi:
 
         if peak is None:
             peak_height = uint32(0)
-            last_peak_timestamp = uint64(0)
+            last_peak_timestamp: Optional[uint64] = uint64(0)
             last_block_cost = 0
             fee_rate_last_block = 0.0
             last_tx_block_fees = uint64(0)
@@ -1011,7 +1011,6 @@ class FullNodeRpcApi:
             while last_tx_block is None or last_peak_timestamp is None:
                 peak_with_timestamp -= 1
                 last_tx_block = self.service.blockchain.height_to_block_record(peak_with_timestamp)
-                assert last_tx_block.timestamp is not None  # mypy
                 last_peak_timestamp = last_tx_block.timestamp
 
             assert last_tx_block is not None  # mypy
