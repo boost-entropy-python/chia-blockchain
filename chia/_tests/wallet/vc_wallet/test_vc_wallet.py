@@ -164,7 +164,7 @@ async def test_vc_lifecycle(wallet_environments: WalletTestFramework) -> None:
     }
 
     # Generate DID as an "authorized provider"
-    async with wallet_0.wallet_state_manager.new_action_scope(DEFAULT_TX_CONFIG, push=True) as action_scope:
+    async with wallet_0.wallet_state_manager.new_action_scope(wallet_environments.tx_config, push=True) as action_scope:
         did_id: bytes32 = bytes32.from_hexstr(
             (
                 await DIDWallet.create_new_did_wallet(
@@ -172,9 +172,10 @@ async def test_vc_lifecycle(wallet_environments: WalletTestFramework) -> None:
                 )
             ).get_my_DID()
         )
+    await full_node_api.wait_for_wallet_synced(wallet_node_0)
 
     # Mint a VC
-    async with wallet_0.wallet_state_manager.new_action_scope(DEFAULT_TX_CONFIG, push=True) as action_scope:
+    async with wallet_0.wallet_state_manager.new_action_scope(wallet_environments.tx_config, push=True) as action_scope:
         ph = await action_scope.get_puzzle_hash(wallet_0.wallet_state_manager)
     vc_record = (
         await client_0.vc_mint(
@@ -462,8 +463,8 @@ async def test_vc_lifecycle(wallet_environments: WalletTestFramework) -> None:
         await client_1.get_transactions(
             GetTransactions(
                 uint32(env_1.dealias_wallet_id("crcat")),
-                uint16(0),
-                uint16(1),
+                uint32(0),
+                uint32(1),
                 reverse=True,
                 type_filter=TransactionTypeFilter.include([TransactionType.INCOMING_CRCAT_PENDING]),
             )
