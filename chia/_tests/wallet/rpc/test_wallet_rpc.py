@@ -97,6 +97,8 @@ from chia.wallet.wallet_node import WalletNode, get_wallet_db_path
 from chia.wallet.wallet_protocol import WalletProtocol
 from chia.wallet.wallet_request_types import (
     AddKey,
+    CancelOffer,
+    CancelOffers,
     CATAssetIDToName,
     CATGetAssetID,
     CATGetName,
@@ -237,7 +239,7 @@ async def assert_get_balance(rpc_client: WalletRpcClient, wallet_node: WalletNod
     expected_balance_dict["fingerprint"] = wallet_node.logged_in_fingerprint
     if wallet.type() in {WalletType.CAT, WalletType.CRCAT}:
         assert isinstance(wallet, CATWallet)
-        expected_balance_dict["asset_id"] = "0x" + wallet.get_asset_id()
+        expected_balance_dict["asset_id"] = "0x" + wallet.get_asset_id().hex()
     else:
         expected_balance_dict["asset_id"] = None
     assert (
@@ -1135,7 +1137,7 @@ async def test_cat_endpoints(wallet_environments: WalletTestFramework, wallet_ty
     asset_id = (await env_0.rpc_client.get_cat_asset_id(CATGetAssetID(cat_0_id))).asset_id
     assert (
         await env_0.rpc_client.get_cat_name(CATGetName(cat_0_id))
-    ).name == wallet_type.default_wallet_name_for_unknown_cat(asset_id.hex())
+    ).name == wallet_type.default_wallet_name_for_unknown_cat(asset_id)
     await env_0.rpc_client.set_cat_name(CATSetName(cat_0_id, "My cat"))
     assert (await env_0.rpc_client.get_cat_name(CATGetName(cat_0_id))).name == "My cat"
     asset_to_name_response = await env_0.rpc_client.cat_asset_id_to_name(CATAssetIDToName(asset_id))
@@ -1577,14 +1579,22 @@ async def test_offer_endpoints(wallet_environments: WalletTestFramework, wallet_
     ).trade_record
     assert TradeStatus(trade_record.status) == TradeStatus.PENDING_CONFIRM
 
-    await env_1.rpc_client.cancel_offer(offer.name(), wallet_environments.tx_config, secure=False)
+    await env_1.rpc_client.cancel_offer(
+        CancelOffer(
+            trade_id=offer.name(),
+            secure=False,
+            push=True,
+        ),
+        tx_config=wallet_environments.tx_config,
+    )
 
     trade_record = (await env_1.rpc_client.get_offer(GetOffer(offer.name(), file_contents=True))).trade_record
     assert trade_record.offer == bytes(offer)
     assert TradeStatus(trade_record.status) == TradeStatus.CANCELLED
 
     failed_cancel_res = await env_1.rpc_client.cancel_offer(
-        offer.name(), wallet_environments.tx_config, fee=uint64(1), secure=True
+        CancelOffer(trade_id=offer.name(), fee=uint64(1), secure=True, push=True),
+        tx_config=wallet_environments.tx_config,
     )
 
     trade_record = (await env_1.rpc_client.get_offer(GetOffer(offer.name()))).trade_record
@@ -1729,7 +1739,9 @@ async def test_offer_endpoints(wallet_environments: WalletTestFramework, wallet_
         )
         == 2
     )
-    await env_1.rpc_client.cancel_offers(wallet_environments.tx_config, batch_size=1)
+    await env_1.rpc_client.cancel_offers(
+        CancelOffers(secure=True, batch_size=uint16(1), push=True), tx_config=wallet_environments.tx_config
+    )
     assert (
         len(
             [
@@ -1784,7 +1796,9 @@ async def test_offer_endpoints(wallet_environments: WalletTestFramework, wallet_
         )
         == 2
     )
-    await env_1.rpc_client.cancel_offers(wallet_environments.tx_config, cancel_all=True)
+    await env_1.rpc_client.cancel_offers(
+        CancelOffers(secure=True, cancel_all=True, push=True), tx_config=wallet_environments.tx_config
+    )
     assert (
         len(
             [
@@ -1846,7 +1860,9 @@ async def test_offer_endpoints(wallet_environments: WalletTestFramework, wallet_
         )
         == 1
     )
-    await env_1.rpc_client.cancel_offers(wallet_environments.tx_config, asset_id=bytes32.zeros)
+    await env_1.rpc_client.cancel_offers(
+        CancelOffers(secure=True, asset_id=bytes32.zeros.hex(), push=True), tx_config=wallet_environments.tx_config
+    )
     assert (
         len(
             [
@@ -1857,7 +1873,9 @@ async def test_offer_endpoints(wallet_environments: WalletTestFramework, wallet_
         )
         == 1
     )
-    await env_1.rpc_client.cancel_offers(wallet_environments.tx_config, asset_id=cat_asset_id)
+    await env_1.rpc_client.cancel_offers(
+        CancelOffers(secure=True, asset_id=cat_asset_id.hex(), push=True), tx_config=wallet_environments.tx_config
+    )
     assert (
         len(
             [
