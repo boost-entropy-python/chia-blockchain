@@ -386,14 +386,24 @@ async def test_push_transactions(wallet_environments: WalletTestFramework) -> No
         )
     ).signed_tx
 
+    with pytest.raises(ValueError, match="Cannot add conditions to a transaction if no new fee spend is being added"):
+        await client.push_transactions(
+            PushTransactions(transactions=[tx]),
+            tx_config=wallet_environments.tx_config,
+            extra_conditions=(Remark(rest=Program.to("foo")),),
+        )
+
     resp_client = await client.push_transactions(
         PushTransactions(transactions=[tx], fee=uint64(10)),
         wallet_environments.tx_config,
     )
+    await full_node_api.wait_for_wallet_synced(wallet_node)
     resp = await client.fetch("push_transactions", {"transactions": [tx.to_json_dict()], "fee": 10})
     assert resp["success"]
+    await full_node_api.wait_for_wallet_synced(wallet_node)
     resp = await client.fetch("push_transactions", {"transactions": [bytes(tx).hex()], "fee": 10})
     assert resp["success"]
+    await full_node_api.wait_for_wallet_synced(wallet_node)
 
     spend_bundle = WalletSpendBundle.aggregate(
         [tx.spend_bundle for tx in resp_client.transactions if tx.spend_bundle is not None]
@@ -3581,8 +3591,11 @@ async def test_split_coins(wallet_environments: WalletTestFramework, capsys: pyt
         }
     )
 
-    with pytest.raises(ResponseFailureError, match="501 coins is greater then the maximum limit of 500 coins"):
+    with pytest.raises(ValueError, match="501 coins is greater then the maximum limit of 500 coins"):
         await dataclasses.replace(xch_request, number_of_coins=501).run()
+
+    with pytest.raises(ValueError, match="Cannot split into 0 new coins"):
+        await dataclasses.replace(xch_request, number_of_coins=0).run()
 
     with pytest.raises(ResponseFailureError, match="Could not find coin with ID 00000000000000000"):
         await dataclasses.replace(xch_request, target_coin_id=bytes32.zeros).run()
@@ -3613,10 +3626,6 @@ async def test_split_coins(wallet_environments: WalletTestFramework, capsys: pyt
         await env.rpc_client.split_coins(rpc_request, wallet_environments.tx_config)
 
     del env.wallet_state_manager.wallets[uint32(42)]
-
-    await dataclasses.replace(xch_request, number_of_coins=0).run()
-    output = (capsys.readouterr()).out
-    assert "Transaction sent" not in output
 
     with wallet_environments.new_puzzle_hashes_allowed():
         await xch_request.run()
@@ -3777,13 +3786,13 @@ async def test_combine_coins(wallet_environments: WalletTestFramework, capsys: p
     )
 
     # Test some error cases first
-    with pytest.raises(ResponseFailureError, match="greater then the maximum limit"):
+    with pytest.raises(ValueError, match="greater then the maximum limit"):
         await dataclasses.replace(xch_combine_request, number_of_coins=uint16(501)).run()
 
-    with pytest.raises(ResponseFailureError, match="You need at least two coins to combine"):
+    with pytest.raises(ValueError, match="You need at least two coins to combine"):
         await dataclasses.replace(xch_combine_request, number_of_coins=uint16(0)).run()
 
-    with pytest.raises(ResponseFailureError, match="More coin IDs specified than desired number of coins to combine"):
+    with pytest.raises(ValueError, match="More coin IDs specified than desired number of coins to combine"):
         await dataclasses.replace(xch_combine_request, input_coins=(bytes32.zeros,) * 100).run()
 
     # We catch this one
