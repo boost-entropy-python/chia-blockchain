@@ -44,7 +44,6 @@ from chia.consensus.block_creation import unfinished_block_to_full_block_with_mm
 from chia.consensus.block_height_map import BlockHeightMap
 from chia.consensus.blockchain import AddBlockResult, Blockchain, BlockchainMutexPriority, StateChangeSummary
 from chia.consensus.blockchain_interface import BlockchainInterface
-from chia.consensus.coin_store_protocol import CoinStoreProtocol
 from chia.consensus.condition_tools import pkm_pairs
 from chia.consensus.difficulty_adjustment import get_next_sub_slot_iters_and_difficulty
 from chia.consensus.get_block_challenge import post_hard_fork2
@@ -171,7 +170,7 @@ class FullNode:
     _db_wrapper: DBWrapper2 | None = None
     _hint_store: HintStore | None = None
     _block_store: BlockStore | None = None
-    _coin_store: CoinStoreProtocol | None = None
+    _coin_store: CoinStore | None = None
     _mempool_manager: MempoolManager | None = None
     _init_weight_proof: asyncio.Task[None] | None = None
     _blockchain: Blockchain | None = None
@@ -456,7 +455,7 @@ class FullNode:
         return self._pool
 
     @property
-    def coin_store(self) -> CoinStoreProtocol:
+    def coin_store(self) -> CoinStore:
         assert self._coin_store is not None
         return self._coin_store
 
@@ -1925,6 +1924,12 @@ class FullNode:
             sub_slot_iters = self.constants.SUB_SLOT_ITERS_STARTING
 
         tx_peak = self.blockchain.get_tx_peak()
+        # Get filter_challenge for V2 plot filter (challenge hash of a previously
+        # completed sub-slot
+        filter_challenge = self.full_node_store.get_filter_challenge(
+            request.challenge_chain_vdf.challenge,
+            request.index_from_challenge,
+        )
         # Notify farmers of the new signage point
         broadcast_farmer = farmer_protocol.NewSignagePoint(
             request.challenge_chain_vdf.challenge,
@@ -1938,6 +1943,7 @@ class FullNode:
             sp_source_data=SignagePointSourceData(
                 vdf_data=SPVDFSourceData(request.challenge_chain_vdf.output, request.reward_chain_vdf.output)
             ),
+            filter_challenge=filter_challenge,
         )
         msg = make_msg(ProtocolMessageTypes.new_signage_point, broadcast_farmer)
         await self.server.send_to_all([msg], NodeType.FARMER)
@@ -2873,6 +2879,12 @@ class FullNode:
                 for infusion in new_infusions:
                     await self.new_infusion_point_vdf(infusion)
                 tx_peak = self.blockchain.get_tx_peak()
+                # Get filter_challenge for V2 plot filter (challenge hash of a previously
+                # completed sub-slot; SP index 0 is in the first window, so SS(n-2))
+                filter_challenge = self.full_node_store.get_filter_challenge(
+                    end_of_slot_bundle.challenge_chain.get_hash(),
+                    uint8(0),
+                )
                 # Notify farmers of the new sub-slot
                 broadcast_farmer = farmer_protocol.NewSignagePoint(
                     end_of_slot_bundle.challenge_chain.get_hash(),
@@ -2888,6 +2900,7 @@ class FullNode:
                             end_of_slot_bundle.challenge_chain, end_of_slot_bundle.reward_chain
                         )
                     ),
+                    filter_challenge=filter_challenge,
                 )
                 msg = make_msg(ProtocolMessageTypes.new_signage_point, broadcast_farmer)
                 await self.server.send_to_all([msg], NodeType.FARMER)
